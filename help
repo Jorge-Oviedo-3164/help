@@ -1,0 +1,860 @@
+<template>
+  <!--  VISTA LISTAR-->
+  <template v-if="vista==='listar'">
+    <div class="flex flex-wrap justify-center gap-y-3 md:gap-0 sm:justify-between w-full px-4 py-2 items-center">
+      <div class="text-xl font-bold w-full sm:w-auto text-center">
+        Extractos Bancarios
+      </div>
+      <div class="flex flex-wrap gap-3 w-full sm:w-auto">
+        <button @click="actualizarDataPorVista('crear', form);"
+                class="px-4 py-2 text-white bg-green-500 w-full mt-3 sm:mt-0 sm:w-auto rounded-md hover:bg-green-600 focus:outline-none">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+               stroke="currentColor" class="inline-block w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+          </svg>
+          <span class="ml-3">Agregar nuevo extracto bancario</span>
+        </button>
+        <button @click="cargueMasivo()"
+                class="px-4 py-2 text-white bg-blue-500 w-full mt-3 sm:mt-0 sm:w-auto rounded-md hover:bg-blue-600 focus:outline-none">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+               stroke="currentColor" class="inline-block w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+          </svg>
+          <span class="ml-3">Cargue masivo</span>
+        </button>
+      </div>
+    </div>
+    <FilterComponent :criterion="criterion" :search="search" :tableColumns="tableColumns" :orderBy="orderBy"
+                     :order="order" @actualizarValores="actualizarValores"></FilterComponent>
+    <div class="mt-6 overflow-x-auto">
+      <table class="w-full table-auto">
+        <thead class="">
+        <tr class="text-sm font-semibold text-center border-b-2 border-blue-500 uppercase">
+          <template v-for="(value, _, index) in tableColumns" :key='index'>
+            <th class="px-4 py-3" v-if="value.isVisibleInTable">{{ value.value }}</th>
+          </template>
+          <th class="px-4 py-3">Opciones</th>
+        </tr>
+        </thead>
+        <tbody class="text-sm font-normal text-gray-700 text-center">
+        <tr class="py-10 bg-gray-100 hover:bg-gray-200 font-medium"
+            v-for="(extractoBancario, index) of extractosBancarios" :key="'A'+index">
+          <td class="px-4 py-4">
+            {{ extractoBancario['bancoTasaEfectivaAnual'].banco.nombre_banco }}
+          </td>
+          <td class="px-4 py-4">
+            {{ fixDecimals(extractoBancario['bancoTasaEfectivaAnual'].tasa_efectiva_anual) + '%' }}
+          </td>
+          <td class="px-4 py-4">
+            {{ fixCuentaBancaria(extractoBancario['cuentaBancaria'].cuenta_bancaria) }}
+          </td>
+          <td class="px-4 py-4">
+            {{ extractoBancario.year }}
+          </td>
+          <td class="px-4 py-4">
+            {{ getCurrentMonth(extractoBancario.mes) }}
+          </td>
+          <td class="px-4 py-4">
+            {{ extractoBancario.estado ? 'Activo' : 'Inactivo' }}
+          </td>
+          <td class="px-4 py-4">
+            <div class="flex flex-col justify-center lg:flex-row lg:space-x-2 items-stretch space-y-2 lg:space-y-0">
+              <button
+                  @click="actualizarDataPorVista('actualizar', form, extractoBancario);"
+                  class="items-center px-2 py-2 text-white bg-yellow-500 rounded-md hover:bg-yellow-600 focus:outline-none flex gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                </svg>
+                <span style="white-space: nowrap;">Editar extracto</span>
+              </button>
+              <button v-if="!extractoBancario.estado"
+                      @click="activarDesactivarExtractoBancario('activar', extractoBancario)"
+                      class="items-center px-2 py-2 text-white bg-blue-500 rounded-md hover:bg-blue-600 focus:outline-none flex gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.5 12.75l6 6 9-13.5"/>
+                </svg>
+                <span style="white-space: nowrap;">Desactivar extracto</span>
+              </button>
+              <template v-else>
+                <button @click="activarDesactivarExtractoBancario('desactivar', extractoBancario)"
+                        class="items-center px-2 py-2 text-white bg-red-500 rounded-md hover:bg-red-600 focus:outline-none flex gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                       stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                  <span style="white-space: nowrap;">Activar extracto</span>
+                </button>
+                <button @click="actualizarDataPorVista('movimientoListar', form, extractoBancario);"
+                        class="items-center px-2 py-2 text-white bg-blue-500 rounded-md hover:bg-blue-600 focus:outline-none flex gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                       stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>
+                  </svg>
+                  <span style="white-space: nowrap;">Ver movimientos</span>
+                </button>
+              </template>
+            </div>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+    <PaginateComponent :listar="listarExtractosBancarios" :authToken="authToken"
+                       :paginate="paginate" :optionalParams="[orderBy, order, criterion, search]"></PaginateComponent>
+  </template>
+  <!--    VISTA CREAR - ACTUALIZAR-->
+  <template v-else-if="vista==='actualizar'||vista==='crear'">
+    <div class="bg-white px-4 py-5 sm:p-6">
+      <div class="flex flex-wrap justify-center sm:justify-between w-full gap-3 sm:gap-0 py-5 items-center">
+        <div class="text-xl font-bold" v-text="(vista==='crear'?'Crear ':'Actualizar ')+'extracto bancario'"></div>
+        <button @click="actualizarDataPorVista('listar', form);"
+                class="px-4 py-2 text-white bg-green-500 w-full mt-3 sm:mt-0 sm:w-auto rounded-md hover:bg-green-600 focus:outline-none">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+               stroke="currentColor" class="inline-block w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"/>
+          </svg>
+          <span class="ml-3">Volver</span>
+        </button>
+      </div>
+      <div class="grid grid-cols-6 gap-6">
+        <div class="col-span-6 sm:col-span-3 lg:col-span-2">
+          <label for="year" class="block text-sm font-medium text-gray-700">Año</label>
+          <input type="number" step="1" min="1920" id="year" v-model="form.year"
+                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+        </div>
+        <div class="col-span-6 sm:col-span-3 lg:col-span-2">
+          <label for="mes" class="block text-sm font-medium text-gray-700">Mes</label>
+          <select v-model="form.mes"
+                  class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+            <option value="" selected>Seleccione un mes...</option>
+            <option v-for="(nameMonth, key, index) in nameMonths" :value="parseInt(key)+1" :key="'B'+index">
+              {{ nameMonth }}
+            </option>
+          </select>
+        </div>
+        <template v-if="form.year && form.mes">
+          <div class="col-span-6 sm:col-span-3 lg:col-span-2">
+            <label for="banco_id" class="block text-sm font-medium text-gray-700">Nombre del banco</label>
+            <select id="banco_id"
+                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                    v-model="formBancoTasaEfectivaAnual.banco_id">
+              <option value="" selected>Seleccione un banco...</option>
+              <option v-for="(banco, index) of bancos" :key="'C'+index" :value="banco.id">{{
+                  banco.nombre_banco
+                }}
+              </option>
+            </select>
+          </div>
+          <template v-if="formBancoTasaEfectivaAnual.banco_id">
+            <div class="col-span-6 sm:col-span-3 lg:col-span-2">
+              <label for="banco_tasa_efectiva_anual_id" class="block text-sm font-medium text-gray-700">Tasa Efectiva
+                Anual Vigente</label>
+              <input type="text" id="banco_tasa_efectiva_anual_id"
+                     :value="tasaEA?'%'+tasaEA.tasa_efectiva_anual:'No hay una Tasa E.A. vigente activa'" disabled
+                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            </div>
+            <div class="col-span-6 sm:col-span-3 lg:col-span-2">
+              <label for="cuenta_bancaria_id" class="block text-sm font-medium text-gray-700">Cuenta bancaria</label>
+              <select id="cuenta_bancaria_id"
+                      class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                      v-model="form.cuenta_bancaria_id">
+                <option value="" selected>Seleccione una cuenta bancaria...</option>
+                <option v-for="(cuentaBancaria, index) of cuentasBancarias" :key="'D'+index" :value="cuentaBancaria.id">
+                  {{
+                    cuentaBancaria.cuenta_bancaria
+                  }}
+                </option>
+              </select>
+            </div>
+          </template>
+        </template>
+      </div>
+      <div class="mt-3">
+        <template v-if="!(form.year && form.mes)">
+          <p class="text-left"><b>IMPORTANTE: </b></p>
+          <p class="text-left">- Debe ingresar el mes y el año para seleccionar el banco correspondiente
+            al extracto bancario.
+          </p>
+        </template>
+        <template v-else>
+          <template v-if="!formBancoTasaEfectivaAnual.banco_id&&bancos.length">
+            <p class="text-left"><b>IMPORTANTE: </b></p>
+            <p class="text-left">- Debe seleccionar un banco para cargar la <b>Tasa Efectiva
+              Anual</b></p>
+          </template>
+          <template v-else-if="!bancos.length">
+            <p class="text-left"><b><span class="text-yellow-500">ADVERTENCIA: </span></b></p>
+            <p class="text-left">- No hay bancos que tengan una <b>Tasa
+              E.A.</b> registrados para el mes y año
+              indicado. <b>Es necesario registrarlo para continuar.</b>
+            </p>
+          </template>
+        </template>
+      </div>
+    </div>
+    <div class="bg-gray-50 px-4 py-3 text-right sm:px-6">
+      <button type="button" @click="guardarActualizarExtractoBancario(vista, form)"
+              v-text="vista==='crear'?'Guardar':'Actualizar'"
+              class="w-full rounded-md sm:w-1/3 lg:w-1/6 border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+      </button>
+    </div>
+  </template>
+  <!--  CALCULAR EXTRACTOS-->
+  <CalcularExtractos :vista="vista" @actualizarValores="actualizarValores"
+                     :informacionCalculoMovimientos="informacionCalculoMovimientos" :listIngresos="listIngresos"
+                     :listEgresos="listEgresos"></CalcularExtractos>
+  <!--  VISTA LISTA DE MOVIMIENTOS-->
+  <Suspense timeout="0">
+    <template #default>
+      <MovimientosBancarios :vista="vista" :extractoBancario="form"
+                            @actualizarValores="actualizarValores"></MovimientosBancarios>
+    </template>
+    <template #fallback>
+      <LoadingComponent></LoadingComponent>
+    </template>
+  </Suspense>
+  <!--  CARGUE MASIVO-->
+  <div class="hidden">
+    <div class="max-w-xl" id="cargue_masivo">
+      <a type="button" href="/assets/informes_rendimientos/plantilla_cargue_masivo_extractos_bancarios.xlsx"
+         class="rounded-md border my-3 mr-3 float-right border-transparent bg-green-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="text-white self-center w-6 h-6 inline-block text-gray-600"
+             fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+        </svg>
+        <span class="ml-3">Descargar plantilla</span>
+      </a>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full my-3">
+        <div class="w-full">
+          <label for="year" class="block text-sm font-medium text-gray-700">Año <span
+              class="text-red-700 font-bold">*</span></label>
+          <input type="number" step="1" min="1920" id="year" v-model="formMasivo.year"
+                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+        </div>
+        <div class="w-full">
+          <label for="mes" class="block text-sm font-medium text-gray-700">Mes <span
+              class="text-red-700 font-bold">*</span></label>
+          <select v-model="formMasivo.mes"
+                  class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+            <option value="" selected>Seleccione un mes...</option>
+            <option v-for="(nameMonth, key, index) in nameMonths" :value="parseInt(key)+1" :key="'E'+index">
+              {{ nameMonth }}
+            </option>
+          </select>
+        </div>
+        <template v-if="formMasivo.year && formMasivo.mes">
+          <div class="w-full">
+            <label for="banco_id" class="block text-sm font-medium text-gray-700">Nombre del banco <span
+                class="text-red-700 font-bold">*</span></label>
+            <select id="banco_id"
+                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                    v-model="formBancoTasaEfectivaAnual.banco_id">
+              <option value="" selected>Seleccione un banco...</option>
+              <option v-for="(banco, index) of bancos" :key="'F'+index" :value="banco.id">{{
+                  banco.nombre_banco
+                }}
+              </option>
+            </select>
+          </div>
+          <template v-if="formBancoTasaEfectivaAnual.banco_id">
+            <div class="w-full">
+              <label for="banco_tasa_efectiva_anual_id" class="block text-sm font-medium text-gray-700">Tasa E.A.
+                Vigente
+                del banco</label>
+              <input type="text" id="banco_tasa_efectiva_anual_id"
+                     :value="tasaEA?'%'+tasaEA.tasa_efectiva_anual:'No hay una Tasa E.A. vigente activa'" disabled
+                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            </div>
+            <div class="w-full">
+              <label for="cuenta_bancaria_id" class="block text-sm font-medium text-gray-700">Cuenta bancaria <span
+                  class="text-red-700 font-bold">*</span></label>
+              <select id="cuenta_bancaria_id"
+                      class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                      v-model="formMasivo.cuenta_bancaria_id">
+                <option value="" selected>Seleccione una cuenta bancaria...</option>
+                <option v-for="(cuentaBancaria, index) of cuentasBancarias" :key="'G'+index" :value="cuentaBancaria.id">
+                  {{
+                    cuentaBancaria.cuenta_bancaria
+                  }}
+                </option>
+              </select>
+            </div>
+          </template>
+        </template>
+        <div class="w-full">
+          <label for="saldo_inicial" class="block text-sm font-medium text-gray-700">Saldo inicial <span
+              class="text-red-700 font-bold">*</span></label>
+          <input v-model="formMasivo.saldo_inicial" id="saldo_inicial"
+                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                 type="text"/>
+        </div>
+      </div>
+      <div class="mt-3">
+        <template v-if="!(formMasivo.year && formMasivo.mes)">
+          <p class="text-left"><b>IMPORTANTE: </b></p>
+          <p class="text-left">- Debe ingresar el mes y el año para seleccionar el banco correspondiente
+            al extracto bancario.
+          </p>
+        </template>
+        <template v-else>
+          <template v-if="!formBancoTasaEfectivaAnual.banco_id&&bancos.length">
+            <p class="text-left"><b>IMPORTANTE: </b></p>
+            <p class="text-left">- Debe seleccionar un banco para cargar la <b>Tasa Efectiva
+              Anual</b></p>
+          </template>
+          <template v-else-if="!bancos.length">
+            <p class="text-left"><b><span class="text-yellow-500">ADVERTENCIA: </span></b></p>
+            <p class="text-left">- No hay bancos que tengan una <b>Tasa
+              E.A.</b> registrados para el mes y año
+              indicado. <b>Es necesario registrarlo para continuar.</b>
+            </p>
+          </template>
+        </template>
+      </div>
+      <div class="my-3">
+        <p class="text-left font-bold">Nota:</p>
+        <p class="text-left"><b>-</b> Los campos con <span class="text-red-700">*</span> son requeridos.</p>
+        <p class="text-left"><b>-</b> Si el saldo inicial es un egreso, el valor debe ser negativo (-).</p>
+        <p class="text-left"><b>-</b> Los números con decimales deben ir separados por un punto.</p>
+        <p class="text-left me-3"><b>EJ:</b> 51200.50</p>
+      </div>
+      <label style="min-height: 8rem;" for="archivo"
+             class="flex justify-center w-full transition bg-white border-2 border-gray-300 border-dashed rounded-md appearance-none cursor-pointer hover:border-gray-400 focus:outline-none">
+        <span ref="fileFormEnter" id="contenedor_archivo" class="flex items-center space-x-2 w-full">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gray-600 grow" fill="none" viewBox="0 0 24 24"
+               stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+          </svg>
+          <span class="font-medium text-gray-600 grow">
+          Arrastra el archivo aquí, o
+          <span class="text-blue-600 underline">abre el explorador</span>
+          </span>
+        </span>
+        <span ref="fileFormDrop" id="drag_over" class="hidden">
+            <svg xmlns="http://www.w3.org/2000/svg" class="self-center w-6 h-6 inline-block text-gray-600 grow"
+                 fill="none"
+                 viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+            </svg>
+        </span>
+        <span ref="fileFormUploaded" id="info_archivo" class="hidden">
+          <img id="preview_archivo" src="" alt=""/>
+          <span class="flex justify-center align-middle gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" class="self-center w-6 h-6 inline-block text-gray-600" fill="none"
+                 viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/>
+            </svg>
+            <span id="nombre_archivo" class="self-center"></span>
+          </span>
+        </span>
+        <input type="file" id="archivo"
+               accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+               class="hidden" @change="
+               uploadFile(document.getElementById('archivo').files.item(0));
+               file=document.getElementById('archivo').files.item(0);">
+      </label>
+    </div>
+  </div>
+</template>
+<script>
+import LoadingComponent from "@/layouts/LoadingComponent";
+import {monthNames, swal} from "@/common/constants/variables";
+import {nextTick, ref, watch} from "vue";
+import {useAuth} from "@/components/auth/store/composables";
+import {generateTextError, uploadFile, useAPIRest, verifyHttpCode} from "@/common/constants";
+import MovimientosBancarios from "@/components/rendimientos/components/MovimientosBancarios";
+import FilterComponent from "@/layouts/FilterComponent";
+import {
+  copiaProfunda,
+  enableUploadFileByDragger,
+  filterCustomSearch,
+  firstLetterCapitalize,
+  fixCuentaBancaria,
+  fixDecimals,
+  getCurrentMonth,
+  removeFile,
+  separateNumberByCommaInput
+} from "@/common/constants/functions";
+import CalcularExtractos from "@/components/rendimientos/components/CalcularExtracto";
+import PaginateComponent from "@/layouts/PaginateComponent";
+
+export default {
+  name: 'ExtractosBancarios',
+  components: {LoadingComponent, FilterComponent, MovimientosBancarios, CalcularExtractos, PaginateComponent},
+  data: function () {
+    return {
+      nameMonths: Object.assign({}, monthNames),
+      getCurrentMonth: getCurrentMonth,
+      fixCuentaBancaria: fixCuentaBancaria,
+      fixDecimals: fixDecimals,
+      document: document,
+      uploadFile: uploadFile,
+      alertCargueMasivo: '',
+      file: undefined,
+      listIngresos: [],
+      listEgresos: [],
+      tableColumns: {
+        'banco.nombre_banco': {
+          isFilter: true,
+          isOrder: true,
+          isVisibleInTable: true,
+          value: 'Nombre del banco'
+        },
+        'banco_tasa_efectiva_anual.tasa_efectiva_anual': {
+          isFilter: true,
+          isOrder: true,
+          isVisibleInTable: true,
+          value: 'Tasa efectiva anual'
+        },
+        'cuentaBancaria.cuenta_bancaria': {
+          isFilter: true,
+          isOrder: true,
+          isVisibleInTable: true,
+          value: 'Cuenta bancaria'
+        },
+        'year': {
+          isFilter: true,
+          isOrder: true,
+          isVisibleInTable: true,
+          value: 'Año'
+        },
+        'mes': {
+          isFilter: true,
+          isOrder: true,
+          isVisibleInTable: true,
+          value: 'Mes'
+        },
+        'estado': {
+          isFilter: true,
+          isOrder: true,
+          isVisibleInTable: true,
+          value: 'Estado'
+        },
+        'created_at': {
+          isFilter: true,
+          isOrder: true,
+          isVisibleInTable: false,
+          value: 'Fecha de creación'
+        }
+      },
+      informacionCalculoMovimientos: []
+    }
+  },
+  async setup() {
+    const criterion = ref('');
+    const search = ref('');
+    const orderBy = ref('created_at');
+    const order = ref('ASC');
+    const bancos = ref([]);
+    const tasaEA = ref({
+      "id": "",
+      "created_at": "",
+      "banco_id": "",
+      "tasa_efectiva_anual": "",
+      "fecha_inicial_vigencia": "",
+      "estado": ""
+    });
+    const tasaEAChanged = ref(false);
+    const formMasivo = ref({
+      banco_id: '',
+      tasa_e_a_id: '',
+      cuenta_bancaria_id: '',
+      year: '',
+      mes: '',
+      saldo_inicial: ''
+    });
+    const form = ref({
+      id: '',
+      banco_tasa_efectiva_anual_id: '',
+      cuenta_bancaria_id: '',
+      year: '',
+      mes: '',
+      estado: ''
+    });
+    const formBancoTasaEfectivaAnual = ref({
+      banco_id: ''
+    });
+    const extractosBancarios = ref([]);
+    const cuentasBancarias = ref([]);
+    const paginate = ref({
+      "page": 1,
+      "take": 10,
+      "itemCount": 0,
+      "pageCount": 1,
+      "hasPreviousPage": false,
+      "hasNextPage": false
+    });
+    const vista = ref('listar');
+    const authStored = useAuth();
+    const authToken = ref(authStored.authToken);
+    const listarTasasEA = async (tokenUpdated, page = 1, orderBy = 'created_at', order = 'ASC', criterion = '', search = '', where = '', isPaginate = true) => {
+      search = filterCustomSearch(criterion, search);
+      await useAPIRest(process.env.VUE_APP_NEST_BANCOTEA_FINDALL, 'GET', tokenUpdated, undefined, {
+        page,
+        orderBy,
+        order,
+        criterion,
+        search,
+        where,
+        isPaginate
+      }).then(async resJSON => {
+        const {statusCode} = resJSON;
+        delete resJSON.statusCode;
+        const textoError = generateTextError(resJSON);
+        if (verifyHttpCode(statusCode, 'success')) tasaEA.value = resJSON[0];
+        else await swal.fire(textoError, '', 'error');
+      });
+    }
+    const listarCuentasBancarias = async (tokenUpdated, page = 1, orderBy = 'created_at', order = 'ASC', criterion = '', search = '', where = '') => await useAPIRest(process.env.VUE_APP_NEST_CUENTABANCARIA_FINDALL, 'GET', tokenUpdated, undefined, {
+      page,
+      orderBy,
+      order,
+      criterion,
+      search,
+      where,
+      isPaginate: false
+    }).then(resJSON => {
+      const {statusCode} = resJSON;
+      delete resJSON.statusCode;
+      const textoError = generateTextError(resJSON);
+      if (verifyHttpCode(statusCode, 'success')) cuentasBancarias.value = resJSON;
+      else swal.fire(textoError, '', 'error');
+    });
+    const listarBancosPorMesYear = async (oldForm, tokenUpdated, page = 1, orderBy = 'created_at', order = 'ASC', criterion = '', search = '', where = '', isPaginate = true) => {
+      if (!['actualizar', 'movimientoListar'].includes(vista.value)) {
+        form.value.cuenta_bancaria_id = '';
+        formMasivo.value.cuenta_bancaria_id = '';
+      }
+      formBancoTasaEfectivaAnual.value.banco_id = '';
+      form.value.banco_tasa_efectiva_anual_id = '';
+      formMasivo.value.banco_tasa_efectiva_anual_id = '';
+      search = filterCustomSearch(criterion, search);
+      await useAPIRest(process.env.VUE_APP_NEST_BANCOTEA_FINDALL, 'GET', tokenUpdated, undefined, {
+        page,
+        orderBy,
+        order,
+        criterion,
+        search,
+        where,
+        isPaginate
+      }).then(async resJSON => {
+        const {statusCode} = resJSON;
+        delete resJSON.statusCode;
+        const textoError = generateTextError(resJSON);
+        if (verifyHttpCode(statusCode, 'success')) {
+          const listBancos = [];
+          for (const tasa of resJSON) {
+            listBancos.push(tasa.banco);
+          }
+          bancos.value = listBancos;
+        } else await swal.fire(textoError, '', 'error');
+      });
+    }
+    const listarExtractosBancarios = async (tokenUpdated, page = 1, orderBy = 'created_at', order = 'ASC', criterion = '', search = '', where = '', isPaginate = true) => {
+      search = filterCustomSearch(criterion, search);
+      await useAPIRest(process.env.VUE_APP_NEST_EXTRACTOBANCARIO_FINDALL, 'GET', tokenUpdated, undefined, {
+        page,
+        orderBy,
+        order,
+        criterion,
+        search,
+        where,
+        isPaginate
+      }).then(async resJSON => {
+        const {statusCode} = resJSON;
+        delete resJSON.statusCode;
+        const textoError = generateTextError(resJSON);
+        if (verifyHttpCode(statusCode, 'success')) {
+          extractosBancarios.value = resJSON.data;
+          paginate.value = resJSON.meta;
+        } else await swal.fire(textoError, '', 'error');
+      });
+    }
+    watch(authToken, async (tokenUpdated, oldToken) => {
+      if (!oldToken) await listarExtractosBancarios(tokenUpdated);
+    });
+    watch(order, async (order) => await listarExtractosBancarios(authToken.value, 1, orderBy.value, order, criterion.value, search.value));
+    watch(orderBy, async (orderBy) => await listarExtractosBancarios(authToken.value, 1, orderBy, order.value, criterion.value, search.value));
+    watch(search, async (search) => await listarExtractosBancarios(authToken.value, 1, orderBy.value, order.value, criterion.value, search));
+    watch(() => ({...formMasivo.value}), async (formMasivo, oldFormMasivo) => {
+      if (formMasivo.mes && formMasivo.year && (oldFormMasivo.mes !== formMasivo.mes || oldFormMasivo.year !== formMasivo.year))
+        await listarBancosPorMesYear(oldFormMasivo, authToken.value, 1, 'created_at', 'ASC', '', '', `table.estado = 1, table.year = ${formMasivo.year}, table.mes = ${formMasivo.mes}`, false);
+    });
+    watch(() => ({...form.value}), async (form, oldForm) => {
+      if (form.mes && form.year && (oldForm.mes !== form.mes || oldForm.year !== form.year))
+        await listarBancosPorMesYear(oldForm, authToken.value, 1, 'created_at', 'ASC', '', '', `table.estado = 1, table.year = ${form.year}, table.mes = ${form.mes}`, false);
+    });
+    watch(() => formBancoTasaEfectivaAnual.value.banco_id, async (banco_id) => {
+      if (vista.value === 'listar' && banco_id)
+        await listarTasasEA(authToken.value, 1, orderBy.value, order.value, criterion.value, search.value, `table.banco_id=${banco_id}, table.estado = 1, table.year = ${formMasivo.value.year}, table.mes = ${formMasivo.value.mes}`, false);
+      else if (['crear', 'actualizar'].includes(vista.value) && banco_id)
+        await listarTasasEA(authToken.value, 1, 'created_at', 'ASC', '', '', `table.banco_id=${banco_id}, table.estado = 1, table.year = ${form.value.year}, table.mes = ${form.value.mes}`, false);
+      if (banco_id)
+        await listarCuentasBancarias(authToken.value, 1, 'created_at', 'ASC', '', '', `table.banco_id=${banco_id}, table.estado = 1`, false);
+    });
+    if (authToken.value && !extractosBancarios.value.length) await listarExtractosBancarios(authToken.value);
+    const guardarActualizarExtractoBancario = async (accion, form) => {
+      const textoExitoso = '¡El extracto bancario fue ' + (accion === 'crear' ? 'creado' : 'actualizado') + ' exitosamente!';
+      const dataForm = {
+        banco_tasa_efectiva_anual_id: form.banco_tasa_efectiva_anual_id,
+        cuenta_bancaria_id: form.cuenta_bancaria_id,
+        year: form.year,
+        mes: form.mes
+      };
+      if (accion === 'crear') return await useAPIRest(process.env.VUE_APP_NEST_EXTRACTOBANCARIO_CREATE, 'POST', authToken.value, dataForm).then(resJSON => {
+        const {statusCode} = resJSON;
+        delete resJSON.statusCode;
+        const textoError = generateTextError(resJSON);
+        if (verifyHttpCode(statusCode, 'success')) swal.fire(textoExitoso, '', 'success').then(async () => {
+          await listarExtractosBancarios(authToken.value);
+          vista.value = 'listar';
+        });
+        else swal.fire(textoError, '', 'error');
+      });
+      else {
+        if (tasaEAChanged.value) return await swal.fire({
+          title: '¿Esta seguro de actualizar este extracto bancario?',
+          html: 'Al actualizar la Tasa E.A. de este extracto bancario, deberá de <b>recalcular</b> el extracto para actualizar el valor de rendimientos con Tasa Pactada. El sistema <b>eliminará</b> el anterior valor guardado.',
+          icon: 'warning',
+          showCloseButton: true,
+          showCancelButton: true,
+          focusConfirm: false,
+          confirmButtonText: 'Continuar de todos modos',
+          cancelButtonText: 'Cancelar',
+          showLoaderOnConfirm: true,
+          preConfirm: async () => {
+            dataForm['interes_tasa_pactada'] = '0';
+            await useAPIRest(process.env.VUE_APP_NEST_EXTRACTOBANCARIO_UPDATE.replace(':id', form.id), 'PATCH', authToken.value, dataForm).then(resJSON => {
+              const {statusCode} = resJSON;
+              delete resJSON.statusCode;
+              const textoError = generateTextError(resJSON);
+              if (verifyHttpCode(statusCode, 'success')) swal.fire(textoExitoso, '', 'success').then(async () => {
+                await listarExtractosBancarios(authToken.value, paginate.value.page, orderBy.value, order.value, criterion.value, search.value);
+                vista.value = 'listar';
+              });
+              else swal.fire(textoError, '', 'error');
+            });
+          },
+          allowOutsideClick: () => !swal.isLoading()
+        }).then(result => result.value);
+        else return await useAPIRest(process.env.VUE_APP_NEST_EXTRACTOBANCARIO_UPDATE.replace(':id', form.id), 'PATCH', authToken.value, dataForm).then(resJSON => {
+          const {statusCode} = resJSON;
+          delete resJSON.statusCode;
+          const textoError = generateTextError(resJSON);
+          if (verifyHttpCode(statusCode, 'success')) swal.fire(textoExitoso, '', 'success').then(async () => {
+            await listarExtractosBancarios(authToken.value, paginate.value.page, orderBy.value, order.value, criterion.value, search.value);
+            vista.value = 'listar';
+          });
+          else swal.fire(textoError, '', 'error');
+        });
+      }
+    };
+    const activarDesactivarExtractoBancario = async (accion, banco) => {
+      const textoExitoso = '¡Extracto bancario ' + (accion === 'activar' ? 'activado' : 'desactivado') + ' con exito!';
+      return await swal.fire({
+        title: '¿Esta seguro de ' + (accion) + ' este extracto bancario?',
+        icon: 'warning',
+        showCloseButton: true,
+        showCancelButton: true,
+        focusConfirm: false,
+        confirmButtonText: firstLetterCapitalize(accion),
+        cancelButtonText: 'Cancelar'
+      }).then(async (result) => {
+        if (result.isConfirmed) {
+          await useAPIRest(process.env.VUE_APP_NEST_EXTRACTOBANCARIO_UPDATESTATE.replace(':id', banco.id), 'PATCH', authToken.value).then(resJSON => {
+            const {statusCode} = resJSON;
+            delete resJSON.statusCode;
+            const textoError = generateTextError(resJSON);
+            if (verifyHttpCode(statusCode, 'success')) swal.fire(textoExitoso, '', 'success').then(banco.estado = resJSON.estado);
+            else swal.fire(textoError, '', 'error');
+          })
+        }
+      });
+    };
+    return {
+      authToken,
+      orderBy,
+      order,
+      criterion,
+      search,
+      bancos,
+      cuentasBancarias,
+      form,
+      formMasivo,
+      formBancoTasaEfectivaAnual,
+      tasaEA,
+      tasaEAChanged,
+      extractosBancarios,
+      vista,
+      paginate,
+      listarExtractosBancarios,
+      guardarActualizarExtractoBancario,
+      activarDesactivarExtractoBancario
+    };
+  },
+  methods: {
+    limpiarFormulario(form = null, limpiarArchivo = false) {
+      if (form) for (const data in form) {
+        form[data] = '';
+      }
+      if (limpiarArchivo) {
+        removeFile(this.alertCargueMasivo);
+        this.file = undefined;
+      }
+    },
+    cargueMasivo: async function () {
+      if (!this.alertCargueMasivo) {
+        this.alertCargueMasivo = document.getElementById('cargue_masivo');
+        document.getElementById('cargue_masivo').remove();
+      }
+      await swal.fire({
+        html: this.alertCargueMasivo,
+        showCloseButton: true,
+        showCancelButton: true,
+        focusConfirm: false,
+        cancelButtonText: 'Cancelar',
+        confirmButtonText: 'Cargar archivo',
+        customClass: {
+          actions: 'm-0'
+        },
+        showLoaderOnConfirm: true,
+        preConfirm: async () => {
+          this.formMasivo.banco_id = this.formBancoTasaEfectivaAnual.banco_id;
+          this.formMasivo.tasa_e_a_id = this.tasaEA['id'];
+          this.formMasivo.saldo_inicial = this.formMasivo.saldo_inicial.replaceAll(',', '');
+          const valuesRequired = [this.formMasivo.banco_id, this.formMasivo.cuenta_bancaria_id, this.formMasivo.year, this.formMasivo.mes, this.formMasivo.saldo_inicial];
+          if (Object.values(valuesRequired).filter(valor => !valor).length) await swal.fire('Por favor rellene todos los campos requeridos', '', 'error');
+          else if (!this.formMasivo.tasa_e_a_id) await swal.fire({
+            title: 'Es necesario una Tasa E.A. vigente del banco',
+            html: '<b>Importante:</b> Asegurate de haber seleccionado el año, mes y el banco del extracto, para seleccionar la Tasa E.A. vigente.',
+            icon: 'error'
+          });
+          else {
+            const archivoCargado = this.file;
+            if (archivoCargado) {
+              const extenciones_excel_validas = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+              if (extenciones_excel_validas.includes(archivoCargado.type)) {
+                // ENVIAR ARCHIVO AL BACKEND Y PROCESAR LOS DATOS, DE TAL MANERA QUE SE ENVIÉ LO ESPERADO AL ENDPOINT DE CALCULAR EXTRACTOS.
+                const formData = new FormData();
+                formData.append('form', JSON.stringify(this.formMasivo));
+                formData.append('file', archivoCargado, archivoCargado.name);
+                const cargarExtracto = async (formData, authToken) => await useAPIRest(process.env.VUE_APP_NEST_INFORMACIONRENDIMIENTOS_CARGUEEXTRACTO, 'POST', authToken, formData, undefined, 'auto').then(async resJSON => {
+                  const {statusCode} = resJSON;
+                  const textoError = generateTextError(resJSON);
+                  if (verifyHttpCode(statusCode, 'success')) {
+                    delete resJSON.statusCode;
+                    return resJSON;
+                  } else {
+                    if (textoError === 'El extracto bancario ya se encuentra registrado') {
+                      return await swal.fire({
+                        title: textoError,
+                        html: '<p>Si continua, todos los movimientos del extracto que ya se encuentran registrados en el sistema, serán eliminados y en su lugar se agregarán los movimientos del extracto que se encuentran en el Excel. <span><b>¿Desea continuar?</b></span></p>',
+                        icon: 'warning',
+                        showCloseButton: true,
+                        showCancelButton: true,
+                        focusConfirm: false,
+                        confirmButtonText: 'Continuar de todos modos',
+                        cancelButtonText: 'Cancelar',
+                        showLoaderOnConfirm: true,
+                        preConfirm: async () => {
+                          formData.append('responseError', JSON.stringify(resJSON));
+                          return await cargarExtracto(formData, authToken);
+                        },
+                        allowOutsideClick: () => !swal.isLoading()
+                      }).then(result => result.value);
+                    } else await swal.fire(textoError, '', 'error');
+                  }
+                });
+                return await cargarExtracto(formData, this.authToken);
+              } else await swal.fire('¡Solo se admiten archivos Excel con el formato .xls, xlsx o .csv!', '', 'error');
+            } else await swal.fire('¡No se cargo ningun archivo!', '', 'error');
+          }
+        },
+        allowOutsideClick: () => !swal.isLoading()
+      }).then(async (result) => {
+        if (result.isConfirmed && result.value !== true) {
+          const resJSON = result.value;
+          const {statusCode} = resJSON;
+          delete resJSON['statusCode'];
+          if (verifyHttpCode(statusCode, 'errorServer')) await swal.fire('Error inesperado. Informar al administrador.', '', 'error');
+          else {
+            this.informacionCalculoMovimientos = result.value;
+            for (const value of Object.values(result.value[this.formMasivo.year][this.formMasivo.mes]['movimientos'])) {
+              const {ingreso, egreso} = value;
+              this.listIngresos.push(ingreso);
+              this.listEgresos.push(egreso);
+            }
+            await swal.fire({
+              title: '¡Extracto generado con exito!',
+              html: '<p>¿Desea realizar el cálculo de los intereses del extracto registrado?</p>',
+              icon: 'warning',
+              showCloseButton: true,
+              showCancelButton: true,
+              focusConfirm: false,
+              confirmButtonText: '¡Realizar calculo!',
+              cancelButtonText: 'Cancelar'
+            }).then(async result => {
+              if (result.isConfirmed) this.vista = 'calcularExtracto';
+            });
+            await this.listarExtractosBancarios(this.authToken);
+            this.limpiarFormulario(this.formMasivo, true);
+          }
+        }
+      });
+      this.limpiarFormulario(null, true);
+    },
+    actualizarValores(objectoValor) {
+      for (const key in objectoValor) {
+        this[key] = objectoValor[key];
+      }
+    },
+    actualizarDataPorVista(vista, form, extractoBancario = null) {
+      this.vista = vista;
+      const extractoBancarioCopy = copiaProfunda(extractoBancario);
+      if (vista === 'actualizar') {
+        this.form = extractoBancarioCopy;
+        this.formBancoTasaEfectivaAnual.banco_id = extractoBancarioCopy['bancoTasaEfectivaAnual'].banco_id;
+        this.tasaEA.tasa_efectiva_anual = extractoBancarioCopy['bancoTasaEfectivaAnual'].tasa_efectiva_anual;
+      } else if (vista === 'movimientoListar') this.form = extractoBancarioCopy;
+      else this.limpiarFormulario(form);
+    }
+  },
+  watch: {
+    'tasaEA': function (newTasaEA, oldTasaEA) {
+      if (newTasaEA['tasa_efectiva_anual'] !== oldTasaEA['tasa_efectiva_anual']) this.tasaEAChanged = true;
+      this.form.banco_tasa_efectiva_anual_id = this.tasaEA?.id;
+    },
+    "formMasivo.saldo_inicial": function (newValue) {
+      nextTick(() => this.formMasivo.saldo_inicial = separateNumberByCommaInput(newValue));
+    },
+    "file": function (file) {
+      if (file && window.navigator.userAgent.includes("Firefox")) {
+        const name = file.name;
+        const mimeType = file.type;
+        const lastDot = name.lastIndexOf('.');
+        const fileName = name.substring(0, lastDot);
+        const ext = name.substring(lastDot + 1);
+        if (ext === 'csv' && mimeType !== 'text/csv') this.file = new File([file], `${fileName}.${ext}`, {type: 'text/csv'});
+      }
+    }
+  },
+  mounted() {
+    enableUploadFileByDragger(this);
+  }
+}
+</script>
+<style>
+#contenedor_archivo {
+
+}
+</style>
